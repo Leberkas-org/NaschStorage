@@ -1,4 +1,3 @@
-using Akka;
 using Akka.Actor;
 using Akka.Streams;
 using Akka.Streams.Dsl;
@@ -27,7 +26,9 @@ public sealed class LocalBlobStoreTests : IAsyncLifetime
     {
         await _system.Terminate();
         if (Directory.Exists(_tempDir))
+        {
             Directory.Delete(_tempDir, recursive: true);
+        }
     }
 
     [Fact]

@@ -1,7 +1,6 @@
 using Akka;
 using Akka.IO;
 using Akka.Streams.Dsl;
-using Akka.Streams.IO;
 
 namespace TurboStorage.Local;
 
@@ -40,11 +39,15 @@ public sealed class LocalBlobStore : IBlobStore
             .MapMaterializedValue(ioTask => ioTask.ContinueWith<BlobReadResult>(t =>
             {
                 if (t.IsFaulted)
+                {
                     ExceptionDispatchHelper.Rethrow(t.Exception!);
+                }
 
                 var ioResult = t.Result;
                 if (!ioResult.WasSuccessful)
+                {
                     throw ioResult.Error;
+                }
 
                 return new BlobReadResult
                 {
@@ -69,11 +72,15 @@ public sealed class LocalBlobStore : IBlobStore
             .MapMaterializedValue(ioTask => ioTask.ContinueWith<BlobWriteResult>(t =>
             {
                 if (t.IsFaulted)
+                {
                     ExceptionDispatchHelper.Rethrow(t.Exception!);
+                }
 
                 var ioResult = t.Result;
                 if (!ioResult.WasSuccessful)
+                {
                     throw ioResult.Error;
+                }
 
                 var fi = new FileInfo(fullPath);
                 return new BlobWriteResult
@@ -104,7 +111,9 @@ public sealed class LocalBlobStore : IBlobStore
             {
                 var parentDir = Path.GetDirectoryName(prefixDir);
                 if (parentDir is not null && Directory.Exists(parentDir))
+                {
                     searchRoot = parentDir;
+                }
             }
         }
 
@@ -118,16 +127,18 @@ public sealed class LocalBlobStore : IBlobStore
         }
         catch (DirectoryNotFoundException)
         {
-            files = Enumerable.Empty<string>();
+            files = [];
         }
 
         // Re-apply prefix filter in blob-path space
         var items = files
-            .Select(f => ToBlobPath(f))
+            .Select(ToBlobPath)
             .Where(p => originalPrefix is null || p.StartsWith(originalPrefix, StringComparison.Ordinal));
 
         if (options?.MaxResults is { } max)
+        {
             items = items.Take(max);
+        }
 
         var blobItems = items.Select(blobPath =>
         {
@@ -150,9 +161,13 @@ public sealed class LocalBlobStore : IBlobStore
         {
             var fullPath = ToFullPath(path);
             if (File.Exists(fullPath))
+            {
                 File.Delete(fullPath);
+            }
             else if (Directory.Exists(fullPath))
+            {
                 Directory.Delete(fullPath, recursive: true);
+            }
         }
 
         return Task.CompletedTask;

@@ -19,7 +19,7 @@ public sealed class VirtualBlobStore : IBlobStore
     /// </summary>
     private (IBlobStore store, string relativePath, string mountPrefix) Resolve(string path)
     {
-        var normalized = path.StartsWith('/') ? path : "/" + path;
+        var normalized = path.StartsWith('/') ? path : $"/{path}";
 
         foreach (var kvp in _mounts)
         {
@@ -52,7 +52,7 @@ public sealed class VirtualBlobStore : IBlobStore
                 .MapMaterializedValue(_ => Task.FromException<BlobReadResult>(ex));
         }
 
-        var virtualPath = resolution.mountPrefix + "/" + resolution.relativePath;
+        var virtualPath = $"{resolution.mountPrefix}/{resolution.relativePath}";
         return resolution.store.Read(resolution.relativePath)
             .MapMaterializedValue(task => task.ContinueWith(
                 t => t.IsCompletedSuccessfully
@@ -64,7 +64,7 @@ public sealed class VirtualBlobStore : IBlobStore
     public Sink<ReadOnlyMemory<byte>, Task<BlobWriteResult>> Write(string path, bool append = false)
     {
         var (store, relativePath, mountPrefix) = Resolve(path);
-        var virtualPath = mountPrefix + "/" + relativePath;
+        var virtualPath = $"{mountPrefix}/{relativePath}";
 
         return store.Write(relativePath, append)
             .MapMaterializedValue(task => task.ContinueWith(
@@ -79,19 +79,21 @@ public sealed class VirtualBlobStore : IBlobStore
         // If a prefix is provided, route to the matching mount
         if (options?.Prefix is { } prefix)
         {
-            var normalizedPrefix = prefix.StartsWith('/') ? prefix : "/" + prefix;
+            var normalizedPrefix = prefix.StartsWith('/') ? prefix : $"/{prefix}";
 
             // Find the matching mount
-            foreach (var kvp in _mounts)
+            foreach (var (mountPrefix, value) in _mounts)
             {
-                var mountPrefix = kvp.Key;
                 if (normalizedPrefix.StartsWith(mountPrefix, StringComparison.Ordinal))
                 {
                     var relativePrefix = normalizedPrefix[mountPrefix.Length..].TrimStart('/');
-                    var delegatedOptions = options with { Prefix = string.IsNullOrEmpty(relativePrefix) ? null : relativePrefix };
+                    var delegatedOptions = options with
+                    {
+                        Prefix = string.IsNullOrEmpty(relativePrefix) ? null : relativePrefix
+                    };
 
-                    return kvp.Value.List(delegatedOptions)
-                        .Select(item => item with { Path = mountPrefix + "/" + item.Path });
+                    return value.List(delegatedOptions)
+                        .Select(item => item with { Path = $"{mountPrefix}/{item.Path}" });
                 }
             }
 
@@ -105,7 +107,7 @@ public sealed class VirtualBlobStore : IBlobStore
         {
             var kvp = mountList[0];
             return kvp.Value.List(options)
-                .Select(item => item with { Path = kvp.Key + "/" + item.Path });
+                .Select(item => item with { Path = $"{kvp.Key}/{item.Path}" });
         }
 
         var first = mountList[0];
@@ -113,12 +115,12 @@ public sealed class VirtualBlobStore : IBlobStore
         var rest = mountList.Skip(2).ToArray();
 
         var firstSource = first.Value.List(options)
-            .Select(item => item with { Path = first.Key + "/" + item.Path });
+            .Select(item => item with { Path = $"{first.Key}/{item.Path}" });
         var secondSource = second.Value.List(options)
-            .Select(item => item with { Path = second.Key + "/" + item.Path });
+            .Select(item => item with { Path = $"{second.Key}/{item.Path}" });
         var restSources = rest
             .Select(kvp => kvp.Value.List(options)
-                .Select(item => item with { Path = kvp.Key + "/" + item.Path }))
+                .Select(item => item with { Path = $"{kvp.Key}/{item.Path}" }))
             .ToArray();
 
         return Source.Combine(firstSource, secondSource, i => new Merge<BlobItem>(i), restSources);
@@ -137,7 +139,8 @@ public sealed class VirtualBlobStore : IBlobStore
         await Task.WhenAll(tasks);
     }
 
-    public async Task<IReadOnlyCollection<bool>> ExistsAsync(IReadOnlyCollection<string> paths, CancellationToken ct = default)
+    public async Task<IReadOnlyCollection<bool>> ExistsAsync(IReadOnlyCollection<string> paths,
+        CancellationToken ct = default)
     {
         // We need to preserve input order in the result
         var pathList = paths.ToList();
@@ -169,7 +172,8 @@ public sealed class VirtualBlobStore : IBlobStore
         return results;
     }
 
-    public async Task<IReadOnlyCollection<BlobItem>> GetBlobsAsync(IReadOnlyCollection<string> paths, CancellationToken ct = default)
+    public async Task<IReadOnlyCollection<BlobItem>> GetBlobsAsync(IReadOnlyCollection<string> paths,
+        CancellationToken ct = default)
     {
         var pathList = paths.ToList();
 
@@ -193,7 +197,7 @@ public sealed class VirtualBlobStore : IBlobStore
 
             var prefixed = storeResults.Select(item => item with
             {
-                Path = group.Key + "/" + item.Path,
+                Path = $"{group.Key}/{item.Path}",
             });
 
             lock (allResults)

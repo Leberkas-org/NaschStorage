@@ -56,14 +56,14 @@ public sealed class InMemoryBlobStore : IBlobStore
                 _data[path] = finalData;
 
                 _metadata.AddOrUpdate(path,
-                    _ => new BlobItem
+                    value => new BlobItem
                     {
-                        Path = path,
+                        Path = value,
                         Kind = BlobKind.File,
                         Size = finalData.Length,
                         ModifiedOn = DateTimeOffset.UtcNow,
                     },
-                    (_, existing) => existing with
+                    (_, value) => value with
                     {
                         Size = finalData.Length,
                         ModifiedOn = DateTimeOffset.UtcNow,
