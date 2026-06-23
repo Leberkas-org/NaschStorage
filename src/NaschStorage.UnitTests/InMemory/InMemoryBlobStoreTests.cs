@@ -1,25 +1,20 @@
-using Akka.Actor;
 using Akka.Streams;
 using Akka.Streams.Dsl;
+using Akka.TestKit.Xunit;
 using NaschStorage.InMemory;
 
 namespace NaschStorage.UnitTests.InMemory;
 
-public sealed class InMemoryBlobStoreTests : IAsyncLifetime
+public sealed class InMemoryBlobStoreTests : TestKit
 {
-    private ActorSystem _system = null!;
-    private IMaterializer _materializer = null!;
-    private InMemoryBlobStore _store = null!;
+    private readonly IMaterializer _materializer;
+    private readonly InMemoryBlobStore _store;
 
-    public ValueTask InitializeAsync()
+    public InMemoryBlobStoreTests()
     {
-        _system = ActorSystem.Create("test");
-        _materializer = _system.Materializer();
+        _materializer = Sys.Materializer();
         _store = new InMemoryBlobStore();
-        return ValueTask.CompletedTask;
     }
-
-    public async ValueTask DisposeAsync() => await _system.Terminate();
 
     [Fact]
     public async Task Write_And_Read_RoundTrips()

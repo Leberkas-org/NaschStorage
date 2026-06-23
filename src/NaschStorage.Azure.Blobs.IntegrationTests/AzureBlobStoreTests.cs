@@ -1,37 +1,23 @@
-using Akka.Actor;
 using Akka.Streams;
 using Akka.Streams.Dsl;
+using Akka.TestKit.Xunit;
 using NaschStorage.Azure.Blobs;
 
 namespace NaschStorage.Azure.Blobs.IntegrationTests;
 
-public sealed class AzureBlobStoreTests : IClassFixture<AzuriteContainerFixture>, IAsyncLifetime
+public sealed class AzureBlobStoreTests : TestKit, IClassFixture<AzuriteContainerFixture>
 {
-    private readonly AzuriteContainerFixture _fixture;
-    private ActorSystem _system = null!;
-    private IMaterializer _materializer = null!;
-    private AzureBlobStore _store = null!;
+    private readonly IMaterializer _materializer;
+    private readonly AzureBlobStore _store;
 
     public AzureBlobStoreTests(AzuriteContainerFixture fixture)
     {
-        _fixture = fixture;
-    }
-
-    public ValueTask InitializeAsync()
-    {
-        _system = ActorSystem.Create("test");
-        _materializer = _system.Materializer();
+        _materializer = Sys.Materializer();
         _store = new AzureBlobStore(new AzureBlobStoreOptions
         {
-            ConnectionString = _fixture.ConnectionString,
+            ConnectionString = fixture.ConnectionString,
             ContainerName = $"test-{Guid.NewGuid():N}",
         });
-        return ValueTask.CompletedTask;
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        await _system.Terminate();
     }
 
     [Fact]

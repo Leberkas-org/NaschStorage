@@ -1,30 +1,27 @@
-using Akka.Actor;
 using Akka.Streams;
 using Akka.Streams.Dsl;
+using Akka.TestKit.Xunit;
 using NaschStorage.Local;
 
 namespace NaschStorage.IntegrationTests.Local;
 
-public sealed class LocalBlobStoreTests : IAsyncLifetime
+public sealed class LocalBlobStoreTests : TestKit
 {
-    private ActorSystem _system = null!;
-    private IMaterializer _materializer = null!;
-    private LocalBlobStore _store = null!;
-    private string _tempDir = null!;
+    private readonly IMaterializer _materializer;
+    private readonly LocalBlobStore _store;
+    private readonly string _tempDir;
 
-    public ValueTask InitializeAsync()
+    public LocalBlobStoreTests()
     {
         _tempDir = Path.Combine(Path.GetTempPath(), $"naschstorage-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
-        _system = ActorSystem.Create("test");
-        _materializer = _system.Materializer();
+        _materializer = Sys.Materializer();
         _store = new LocalBlobStore(_tempDir);
-        return ValueTask.CompletedTask;
     }
 
-    public async ValueTask DisposeAsync()
+    protected override void AfterAll()
     {
-        await _system.Terminate();
+        base.AfterAll();
         if (Directory.Exists(_tempDir))
         {
             Directory.Delete(_tempDir, recursive: true);
