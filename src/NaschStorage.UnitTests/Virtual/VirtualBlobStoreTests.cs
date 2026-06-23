@@ -1,33 +1,28 @@
-using Akka.Actor;
 using Akka.Streams;
 using Akka.Streams.Dsl;
+using Akka.TestKit.Xunit;
 using NaschStorage.InMemory;
 using NaschStorage.Virtual;
 
 namespace NaschStorage.UnitTests.Virtual;
 
-public sealed class VirtualBlobStoreTests : IAsyncLifetime
+public sealed class VirtualBlobStoreTests : TestKit
 {
-    private ActorSystem _system = null!;
-    private IMaterializer _materializer = null!;
-    private InMemoryBlobStore _localStore = null!;
-    private InMemoryBlobStore _cacheStore = null!;
-    private VirtualBlobStore _store = null!;
+    private readonly IMaterializer _materializer;
+    private readonly InMemoryBlobStore _localStore;
+    private readonly InMemoryBlobStore _cacheStore;
+    private readonly VirtualBlobStore _store;
 
-    public ValueTask InitializeAsync()
+    public VirtualBlobStoreTests()
     {
-        _system = ActorSystem.Create("test");
-        _materializer = _system.Materializer();
+        _materializer = Sys.Materializer();
         _localStore = new InMemoryBlobStore();
         _cacheStore = new InMemoryBlobStore();
         _store = new VirtualStorageBuilder()
             .Mount("/local", _localStore)
             .Mount("/cache", _cacheStore)
             .Build();
-        return ValueTask.CompletedTask;
     }
-
-    public async ValueTask DisposeAsync() => await _system.Terminate();
 
     [Fact]
     public async Task Write_Routes_To_Correct_Store()
